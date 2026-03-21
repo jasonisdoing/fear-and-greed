@@ -14,9 +14,12 @@ from zoneinfo import ZoneInfo
 
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
+ENV_PATH = Path(__file__).resolve().parent / ".env"
 JSON_PATH = DATA_DIR / "cnn_fear_greed_historic_data.json"
 CSV_PATH = DATA_DIR / "cnn_fear_greed_historic_data.csv"
 CNN_URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+SLACK_CHANNEL_ID = "C0AK2481V33"
+SLACK_API_URL = "https://slack.com/api/chat.postMessage"
 NEW_YORK_TZ = ZoneInfo("America/New_York")
 
 
@@ -28,7 +31,8 @@ class FearGreedRow:
 
 @dataclass(frozen=True)
 class UpdateResult:
-    status: str
+    fetch_status: str
+    update_status: str
     summary: str
     latest_date: str
     latest_value: float
@@ -40,12 +44,44 @@ def is_new_york_weekend(now: datetime | None = None) -> bool:
     return current.weekday() >= 5
 
 
+def load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip("'").strip('"')
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+def is_github_actions() -> bool:
+    return os.environ.get("GITHUB_ACTIONS") == "true"
+
+
 def fetch_cnn_payload() -> dict:
     request = Request(
         CNN_URL,
         headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-            "Accept": "application/json",
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/134.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Origin": "https://www.cnn.com",
+            "Referer": "https://www.cnn.com/markets/fear-and-greed",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site",
         },
     )
 
@@ -54,9 +90,91 @@ def fetch_cnn_payload() -> dict:
             charset = response.headers.get_content_charset() or "utf-8"
             return json.loads(response.read().decode(charset))
     except HTTPError as error:
-        raise RuntimeError(f"CNN API returned {error.code}") from error
+        error_body = error.read(200).decode("utf-8", errors="replace").strip()
+        detail = f": {error_body}" if error_body else ""
+        raise RuntimeError(f"CNN API returned {error.code}{detail}") from error
     except URLError as error:
         raise RuntimeError(f"CNN API request failed: {error.reason}") from error
+
+
+def build_slack_message(
+    *,
+    fetch_status: str,
+    update_status: str | None,
+    summary: str,
+    commit_text: str,
+    run_text: str,
+) -> str:
+    status_emoji = {
+        "updated": "🟢",
+        "no_change": "🟡",
+        "weekend_no_write": "🔵",
+    }.get(update_status, "🔴" if fetch_status == "failed" else "⚪")
+
+    lines = [
+        f"{status_emoji} fear-and-greed 일일 갱신",
+        f"fetch_status: {fetch_status}",
+    ]
+
+    if update_status:
+        lines.append(f"update_status: {update_status}")
+
+    lines.extend([summary, commit_text, run_text])
+    return "\n".join(lines)
+
+
+def send_slack_message(text: str) -> None:
+    token = os.environ.get("SLACK_BOT_TOKEN")
+    if not token:
+        raise RuntimeError("SLACK_BOT_TOKEN is required for local Slack notification")
+
+    request = Request(
+        SLACK_API_URL,
+        data=json.dumps(
+            {
+                "channel": SLACK_CHANNEL_ID,
+                "text": text,
+            }
+        ).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json; charset=utf-8",
+        },
+    )
+
+    with urlopen(request, timeout=30) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    if not payload.get("ok"):
+        raise RuntimeError(f"Slack API error: {payload}")
+
+
+def notify_local_slack_success(result: UpdateResult) -> None:
+    if is_github_actions():
+        return
+
+    text = build_slack_message(
+        fetch_status=result.fetch_status,
+        update_status=result.update_status,
+        summary=result.summary,
+        commit_text="커밋 없음",
+        run_text="Run: local python daily_update.py",
+    )
+    send_slack_message(text)
+
+
+def notify_local_slack_failure(error_message: str) -> None:
+    if is_github_actions():
+        return
+
+    text = build_slack_message(
+        fetch_status="failed",
+        update_status=None,
+        summary=error_message,
+        commit_text="커밋 없음",
+        run_text="Run: local python daily_update.py",
+    )
+    send_slack_message(text)
 
 
 def normalize_timestamp(raw_timestamp: int | float) -> datetime:
@@ -152,7 +270,8 @@ def write_github_output(result: UpdateResult) -> None:
         return
 
     with Path(output_path).open("a", encoding="utf-8") as file:
-        file.write(f"status={result.status}\n")
+        file.write(f"fetch_status={result.fetch_status}\n")
+        file.write(f"update_status={result.update_status}\n")
         file.write(f"latest_date={result.latest_date}\n")
         file.write(f"latest_value={result.latest_value:.1f}\n")
         file.write(f"changed_count={result.changed_count}\n")
@@ -162,26 +281,31 @@ def write_github_output(result: UpdateResult) -> None:
 
 
 def main() -> int:
+    load_env_file(ENV_PATH)
     previous_rows = load_existing_rows()
     previous_latest = previous_rows[-1] if previous_rows else None
+    payload = fetch_cnn_payload()
+    rows = build_rows(payload)
+    latest_row = rows[-1]
 
     if is_new_york_weekend():
-        latest_row = previous_latest or FearGreedRow(date="N/A", value=0.0)
         result = UpdateResult(
-            status="weekend_skip",
-            summary=f"주말 스킵(뉴욕 기준). 현재 저장된 최신값은 {latest_row.date} {latest_row.value:.1f}입니다.",
+            fetch_status="success",
+            update_status="weekend_no_write",
+            summary=(
+                f"조회 성공. 주말이므로 데이터 파일은 갱신하지 않았습니다. "
+                f"원천 최신값은 {latest_row.date} {latest_row.value:.1f}입니다."
+            ),
             latest_date=latest_row.date,
             latest_value=latest_row.value,
             changed_count=0,
         )
         write_github_output(result)
+        notify_local_slack_success(result)
         print(result.summary)
         return 0
 
-    payload = fetch_cnn_payload()
-    rows = build_rows(payload)
     changed = update_files(rows)
-    latest_row = rows[-1]
 
     if changed:
         changed_count, preview = build_change_preview(previous_rows, rows)
@@ -192,9 +316,10 @@ def main() -> int:
         )
         preview_text = f" 변경 내역: {preview}" if preview else ""
         result = UpdateResult(
-            status="updated",
+            fetch_status="success",
+            update_status="updated",
             summary=(
-                f"데이터 업데이트 완료. 최신값 {latest_row.date} {latest_row.value:.1f}. "
+                f"조회 성공. 데이터 업데이트 완료. 최신값 {latest_row.date} {latest_row.value:.1f}. "
                 f"{previous_text}. 변경 일자 {changed_count}건.{preview_text}"
             ),
             latest_date=latest_row.date,
@@ -203,14 +328,16 @@ def main() -> int:
         )
     else:
         result = UpdateResult(
-            status="no_change",
-            summary=f"변경 없음. 최신값은 {latest_row.date} {latest_row.value:.1f}로 유지됩니다.",
+            fetch_status="success",
+            update_status="no_change",
+            summary=f"조회 성공. 변경 없음. 최신값은 {latest_row.date} {latest_row.value:.1f}로 유지됩니다.",
             latest_date=latest_row.date,
             latest_value=latest_row.value,
             changed_count=0,
         )
 
     write_github_output(result)
+    notify_local_slack_success(result)
     print(result.summary)
 
     return 0
@@ -220,5 +347,11 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as error:
+        load_env_file(ENV_PATH)
+        if not is_github_actions():
+            try:
+                notify_local_slack_failure(f"Daily update failed: {error}")
+            except Exception as slack_error:
+                print(f"Local Slack notification failed: {slack_error}", file=sys.stderr)
         print(f"Daily update failed: {error}", file=sys.stderr)
         raise SystemExit(1) from error
