@@ -49,7 +49,8 @@ jobs:
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL_ID: C0AK2481V33
-          UPDATE_STATUS: ${{ steps.update_data.outputs.status }}
+          FETCH_STATUS: ${{ steps.update_data.outputs.fetch_status }}
+          UPDATE_STATUS: ${{ steps.update_data.outputs.update_status }}
           UPDATE_SUMMARY: ${{ steps.update_data.outputs.summary }}
           COMMIT_STATUS: ${{ steps.commit_data.outputs.commit_status }}
           REPOSITORY: ${{ github.repository }}
@@ -68,13 +69,14 @@ jobs:
           status_emoji = {
               "updated": "🟢",
               "no_change": "🟡",
-              "weekend_skip": "🔵",
+              "weekend_no_write": "🔵",
           }.get(os.environ["UPDATE_STATUS"], "⚪")
 
           commit_text = "커밋/푸시 완료" if os.environ.get("COMMIT_STATUS") == "committed" else "커밋 없음"
           text = (
               f"{status_emoji} fear-and-greed 일일 갱신\n"
-              f"상태: {os.environ['UPDATE_STATUS']}\n"
+              f"fetch_status: {os.environ['FETCH_STATUS']}\n"
+              f"update_status: {os.environ['UPDATE_STATUS']}\n"
               f"{os.environ['UPDATE_SUMMARY']}\n"
               f"{commit_text}\n"
               f"Run: https://github.com/{os.environ['REPOSITORY']}/actions/runs/{os.environ['RUN_ID']}"
@@ -120,6 +122,7 @@ jobs:
 
           text = (
               f"🔴 fear-and-greed 일일 갱신 실패\n"
+              f"fetch_status: failed\n"
               f"Workflow: {os.environ['WORKFLOW']}\n"
               f"Repo: {os.environ['REPOSITORY']}\n"
               f"Run: https://github.com/{os.environ['REPOSITORY']}/actions/runs/{os.environ['RUN_ID']}"
