@@ -1,0 +1,41 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - upgrade
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate APP_VERSION
+        id: app_version
+        run: |
+          VERSION=$(TZ=Asia/Seoul date +'%Y-%m-%d-%H')
+          if [ -z "$VERSION" ]; then
+            echo 'APP_VERSION generation failed' >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack (Success)
+        if: ${{ success() }}
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"✅ fear-and-greed 업데이트 완료 (branch: upgrade)\\nAPP_VERSION: ${{ steps.app_version.outputs.version }}\"}" \
+            ${{ secrets.LOGS_SLACK_WEBHOOK }}
+
+      - name: Notify Slack (Failure)
+        if: ${{ failure() }}
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"❌ fear-and-greed 업데이트 실패 (branch: upgrade)\\nRepo: ${{ github.repository }}\\nCommit: ${{ github.sha }}\"}" \
+            ${{ secrets.LOGS_SLACK_WEBHOOK }}

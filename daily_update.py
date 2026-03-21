@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -23,6 +24,15 @@ NEW_YORK_TZ = ZoneInfo("America/New_York")
 class FearGreedRow:
     date: str
     value: float
+
+
+@dataclass(frozen=True)
+class UpdateResult:
+    status: str
+    summary: str
+    latest_date: str
+    latest_value: float
+    changed_count: int
 
 
 def is_new_york_weekend(now: datetime | None = None) -> bool:
@@ -110,19 +120,98 @@ def update_files(rows: list[FearGreedRow]) -> bool:
     return json_changed or csv_changed
 
 
+def load_existing_rows() -> list[FearGreedRow]:
+    if not JSON_PATH.exists():
+        return []
+
+    raw_rows = json.loads(JSON_PATH.read_text(encoding="utf-8"))
+    rows = [FearGreedRow(date=item["d"], value=round(float(item["v"]), 1)) for item in raw_rows]
+    return sorted(rows, key=lambda row: row.date)
+
+
+def build_change_preview(previous_rows: list[FearGreedRow], current_rows: list[FearGreedRow]) -> tuple[int, str]:
+    previous_map = {row.date: row.value for row in previous_rows}
+    current_map = {row.date: row.value for row in current_rows}
+
+    changed_dates = [
+        date
+        for date in sorted(set(previous_map) | set(current_map), reverse=True)
+        if previous_map.get(date) != current_map.get(date)
+    ]
+
+    preview_parts = [
+        f"{date}: {previous_map.get(date, '없음')} → {current_map.get(date, '없음')}"
+        for date in changed_dates[:5]
+    ]
+    return len(changed_dates), ", ".join(preview_parts)
+
+
+def write_github_output(result: UpdateResult) -> None:
+    output_path = os.environ.get("GITHUB_OUTPUT")
+    if not output_path:
+        return
+
+    with Path(output_path).open("a", encoding="utf-8") as file:
+        file.write(f"status={result.status}\n")
+        file.write(f"latest_date={result.latest_date}\n")
+        file.write(f"latest_value={result.latest_value:.1f}\n")
+        file.write(f"changed_count={result.changed_count}\n")
+        file.write("summary<<EOF\n")
+        file.write(result.summary)
+        file.write("\nEOF\n")
+
+
 def main() -> int:
+    previous_rows = load_existing_rows()
+    previous_latest = previous_rows[-1] if previous_rows else None
+
     if is_new_york_weekend():
-        print("Skipping update because it is weekend in New York.")
+        latest_row = previous_latest or FearGreedRow(date="N/A", value=0.0)
+        result = UpdateResult(
+            status="weekend_skip",
+            summary=f"주말 스킵(뉴욕 기준). 현재 저장된 최신값은 {latest_row.date} {latest_row.value:.1f}입니다.",
+            latest_date=latest_row.date,
+            latest_value=latest_row.value,
+            changed_count=0,
+        )
+        write_github_output(result)
+        print(result.summary)
         return 0
 
     payload = fetch_cnn_payload()
     rows = build_rows(payload)
     changed = update_files(rows)
+    latest_row = rows[-1]
 
     if changed:
-        print(f"Updated data files with {len(rows)} rows.")
+        changed_count, preview = build_change_preview(previous_rows, rows)
+        previous_text = (
+            f"이전 최신값 {previous_latest.date} {previous_latest.value:.1f}"
+            if previous_latest
+            else "이전 저장 데이터 없음"
+        )
+        preview_text = f" 변경 내역: {preview}" if preview else ""
+        result = UpdateResult(
+            status="updated",
+            summary=(
+                f"데이터 업데이트 완료. 최신값 {latest_row.date} {latest_row.value:.1f}. "
+                f"{previous_text}. 변경 일자 {changed_count}건.{preview_text}"
+            ),
+            latest_date=latest_row.date,
+            latest_value=latest_row.value,
+            changed_count=changed_count,
+        )
     else:
-        print("No data changes detected.")
+        result = UpdateResult(
+            status="no_change",
+            summary=f"변경 없음. 최신값은 {latest_row.date} {latest_row.value:.1f}로 유지됩니다.",
+            latest_date=latest_row.date,
+            latest_value=latest_row.value,
+            changed_count=0,
+        )
+
+    write_github_output(result)
+    print(result.summary)
 
     return 0
 
