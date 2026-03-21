@@ -1,0 +1,38 @@
+name: Daily Fear & Greed Update
+
+on:
+  schedule:
+    - cron: '15 23 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run daily update
+        run: python daily_update.py
+
+      - name: Commit updated data
+        run: |
+          if git diff --quiet -- data/cnn_fear_greed_historic_data.json data/cnn_fear_greed_historic_data.csv; then
+            echo "No data changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/cnn_fear_greed_historic_data.json data/cnn_fear_greed_historic_data.csv
+          git commit -m "chore: fear and greed data update"
+          git push
