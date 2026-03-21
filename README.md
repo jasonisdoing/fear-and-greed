@@ -59,6 +59,16 @@ Visit:
 - Obviously invalid values are filtered during processing.
 - The goal is to provide a practical long-range dataset for historical analysis.
 
+### Methodology
+
+- CNN does not provide a sufficiently accessible official long-range historical dataset for the Fear & Greed Index.
+- Over time, many people have collected, preserved, and shared pieces of this data through different tools and archives.
+- Recent data is maintained by collecting CNN's unofficial API on a daily basis.
+- Older data is supplemented with [https://web.archive.org/](https://web.archive.org/), public GitHub repositories, records from bots that previously collected the index, and manual verification.
+- This repository does not contain an official full-history dump from CNN. It is a reconstructed long-range historical dataset assembled from multiple sources.
+- Some dates may not perfectly match the original page's displayed date because of posting time, timezone differences, or market holiday handling.
+- The main purpose of this dataset is long-term trend and extreme-zone analysis rather than perfect day-by-day reconstruction.
+
 ### Contributing
 
 If you find missing dates, incorrect values, or processing issues:
@@ -104,12 +114,16 @@ If you find missing dates, incorrect values, or processing issues:
 - 데이터 저널리즘
 - 개인 대시보드와 사이드 프로젝트
 
-### 참고
+### 데이터 구성 방식
 
-- 데이터셋은 수집한 과거 기록을 바탕으로 유지합니다.
+- CNN은 Fear & Greed Index의 장기 히스토릭 데이터를 충분히 접근 가능한 공식 형태로 제공하지 않습니다.
 - 원본 지수 페이지는 CNN Fear & Greed입니다: [https://edition.cnn.com/markets/fear-and-greed](https://edition.cnn.com/markets/fear-and-greed)
-- 명백히 잘못된 값은 처리 과정에서 걸러냅니다.
-- 목표는 장기 히스토리 분석에 바로 활용할 수 있는 실용적인 데이터셋을 제공하는 것입니다.
+- 그래서 오랜 기간 동안 여러 사람들이 다양한 도구와 아카이브를 통해 데이터를 수집하고, 보존하고, 공유해 왔습니다.
+- 최근 데이터는 CNN의 비공식 API를 일별 수집해 유지합니다.
+- 과거 데이터는 [https://web.archive.org/](https://web.archive.org/), 공개 GitHub 저장소, 과거에 동작하던 수집 봇의 기록, 그리고 수동 검증을 통해 보완했습니다.
+- 이 저장소의 데이터는 공식 CNN 전체 히스토리 덤프가 아니라, 복수 출처를 바탕으로 재구성한 장기 히스토리 데이터셋입니다.
+- 일부 날짜는 게시 시점, 타임존, 휴장일 처리 차이로 인해 원페이지 표시일과 완전히 일치하지 않을 수 있습니다.
+- 이 데이터셋의 주된 목적은 일별 완전 복원보다 장기 추세와 극단 구간 분석입니다.
 
 ### 기여
 
