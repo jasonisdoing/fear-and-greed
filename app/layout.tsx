@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import "./globals.css";
 import DashboardSidebar from "@/components/DashboardHeader";
 import { defaultDescription, defaultKeywords, defaultTitle, siteName, siteUrl } from '@/lib/seo';
@@ -17,6 +18,8 @@ const websiteSchema = {
   inLanguage: 'ko-KR',
   description: defaultDescription,
 };
+
+const GOOGLE_ANALYTICS_ID = 'G-0KE2RQ8TPN';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -80,6 +83,18 @@ export default function RootLayout({
         `}} />
       </head>
       <body className={inter.className}>
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GOOGLE_ANALYTICS_ID}');
+          `}
+        </Script>
         <ThemeProvider>
           <div className="dashboard">
             <DashboardSidebar />
