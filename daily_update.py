@@ -247,6 +247,16 @@ def load_existing_rows() -> list[FearGreedRow]:
     return sorted(rows, key=lambda row: row.date)
 
 
+def merge_rows(previous_rows: list[FearGreedRow], fetched_rows: list[FearGreedRow]) -> list[FearGreedRow]:
+    merged_by_date = {row.date: row for row in previous_rows}
+
+    # CNN 원천에 있는 날짜만 최신 값으로 덮어쓰고, 빠진 기존 날짜는 그대로 보전한다.
+    for row in fetched_rows:
+        merged_by_date[row.date] = row
+
+    return sorted(merged_by_date.values(), key=lambda row: row.date)
+
+
 def build_change_preview(previous_rows: list[FearGreedRow], current_rows: list[FearGreedRow]) -> tuple[int, str]:
     previous_map = {row.date: row.value for row in previous_rows}
     current_map = {row.date: row.value for row in current_rows}
@@ -258,10 +268,10 @@ def build_change_preview(previous_rows: list[FearGreedRow], current_rows: list[F
     ]
 
     preview_parts = [
-        f"{date}: {previous_map.get(date, '없음')} → {current_map.get(date, '없음')}"
+        f"- {date}: {previous_map.get(date, '없음')} → {current_map.get(date, '없음')}"
         for date in changed_dates[:5]
     ]
-    return len(changed_dates), ", ".join(preview_parts)
+    return len(changed_dates), "\n".join(preview_parts)
 
 
 def write_github_output(result: UpdateResult) -> None:
@@ -285,7 +295,9 @@ def main() -> int:
     previous_rows = load_existing_rows()
     previous_latest = previous_rows[-1] if previous_rows else None
     payload = fetch_cnn_payload()
-    rows = build_rows(payload)
+    fetched_rows = build_rows(payload)
+    fetched_latest_row = fetched_rows[-1]
+    rows = merge_rows(previous_rows, fetched_rows)
     latest_row = rows[-1]
 
     if is_new_york_weekend():
@@ -294,7 +306,8 @@ def main() -> int:
             update_status="weekend_no_write",
             summary=(
                 f"조회 성공. 주말이므로 데이터 파일은 갱신하지 않았습니다. "
-                f"원천 최신값은 {latest_row.date} {latest_row.value:.1f}입니다."
+                f"저장 최신값은 {latest_row.date} {latest_row.value:.1f}입니다. "
+                f"CNN 원천 최신값은 {fetched_latest_row.date} {fetched_latest_row.value:.1f}입니다."
             ),
             latest_date=latest_row.date,
             latest_value=latest_row.value,
@@ -314,12 +327,13 @@ def main() -> int:
             if previous_latest
             else "이전 저장 데이터 없음"
         )
-        preview_text = f" 변경 내역: {preview}" if preview else ""
+        preview_text = f"\n변경한 일자:\n{preview}" if preview else "\n변경한 일자:\n- 없음"
         result = UpdateResult(
             fetch_status="success",
             update_status="updated",
             summary=(
-                f"조회 성공. 데이터 업데이트 완료. 최신값 {latest_row.date} {latest_row.value:.1f}. "
+                f"조회 성공. 데이터 업데이트 완료. 저장 최신값 {latest_row.date} {latest_row.value:.1f}. "
+                f"CNN 원천 최신값 {fetched_latest_row.date} {fetched_latest_row.value:.1f}. "
                 f"{previous_text}. 변경 일자 {changed_count}건.{preview_text}"
             ),
             latest_date=latest_row.date,
@@ -330,7 +344,10 @@ def main() -> int:
         result = UpdateResult(
             fetch_status="success",
             update_status="no_change",
-            summary=f"조회 성공. 변경 없음. 최신값은 {latest_row.date} {latest_row.value:.1f}로 유지됩니다.",
+            summary=(
+                f"조회 성공. 변경 없음. 저장 최신값은 {latest_row.date} {latest_row.value:.1f}로 유지됩니다. "
+                f"CNN 원천 최신값은 {fetched_latest_row.date} {fetched_latest_row.value:.1f}입니다."
+            ),
             latest_date=latest_row.date,
             latest_value=latest_row.value,
             changed_count=0,
