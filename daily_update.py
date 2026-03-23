@@ -21,7 +21,6 @@ CNN_URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
 SLACK_CHANNEL_ID = "C0AK2481V33"
 SLACK_API_URL = "https://slack.com/api/chat.postMessage"
 NEW_YORK_TZ = ZoneInfo("America/New_York")
-KOREAN_WEEKDAYS = ("월", "화", "수", "목", "금", "토", "일")
 
 
 @dataclass(frozen=True)
@@ -63,21 +62,6 @@ def load_env_file(path: Path) -> None:
 
 def is_github_actions() -> bool:
     return os.environ.get("GITHUB_ACTIONS") == "true"
-
-
-def format_korean_date(date_text: str) -> str:
-    if date_text == "N/A":
-        return date_text
-
-    date_value = datetime.fromisoformat(date_text).date()
-    weekday = KOREAN_WEEKDAYS[date_value.weekday()]
-    return f"{date_text}({weekday})"
-
-
-def format_row_text(row: FearGreedRow | None) -> str:
-    if row is None:
-        return "없음"
-    return f"{format_korean_date(row.date)} {row.value:.1f}"
 
 
 def fetch_cnn_payload() -> dict:
@@ -319,14 +303,9 @@ def main() -> int:
         result = UpdateResult(
             fetch_status="success",
             update_status="weekend_no_write",
-            summary="\n".join(
-                [
-                    f"저장되어 있는 데이터: {format_row_text(previous_latest)}",
-                    (
-                        f"CNN 원천 데이터: {format_row_text(latest_row)} - "
-                        "조회 성공, 주말이므로 데이터 파일은 갱신하지 않았습니다."
-                    ),
-                ]
+            summary=(
+                f"조회 성공. 주말이므로 데이터 파일은 갱신하지 않았습니다. "
+                f"원천 최신값은 {latest_row.date} {latest_row.value:.1f}입니다."
             ),
             latest_date=latest_row.date,
             latest_value=latest_row.value,
@@ -350,13 +329,9 @@ def main() -> int:
         result = UpdateResult(
             fetch_status="success",
             update_status="updated",
-            summary="\n".join(
-                [
-                    f"저장되어 있던 데이터: {format_row_text(previous_latest)}",
-                    f"CNN 원천 데이터: {format_row_text(latest_row)} - 조회 성공, 데이터 업데이트 완료",
-                    f"변경 일자 수: {changed_count}건",
-                    f"이전 최신값 정보: {previous_text}{preview_text}",
-                ]
+            summary=(
+                f"조회 성공. 데이터 업데이트 완료. 최신값 {latest_row.date} {latest_row.value:.1f}. "
+                f"{previous_text}. 변경 일자 {changed_count}건.{preview_text}"
             ),
             latest_date=latest_row.date,
             latest_value=latest_row.value,
@@ -366,12 +341,7 @@ def main() -> int:
         result = UpdateResult(
             fetch_status="success",
             update_status="no_change",
-            summary="\n".join(
-                [
-                    f"저장되어 있는 데이터: {format_row_text(previous_latest)}",
-                    f"CNN 원천 데이터: {format_row_text(latest_row)} - 조회 성공, 변경 없음",
-                ]
-            ),
+            summary=f"조회 성공. 변경 없음. 최신값은 {latest_row.date} {latest_row.value:.1f}로 유지됩니다.",
             latest_date=latest_row.date,
             latest_value=latest_row.value,
             changed_count=0,
