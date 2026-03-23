@@ -296,8 +296,9 @@ def main() -> int:
     previous_latest = previous_rows[-1] if previous_rows else None
     payload = fetch_cnn_payload()
     fetched_rows = build_rows(payload)
-    latest_row = fetched_rows[-1]
+    fetched_latest_row = fetched_rows[-1]
     rows = merge_rows(previous_rows, fetched_rows)
+    latest_row = rows[-1]
 
     if is_new_york_weekend():
         result = UpdateResult(
@@ -305,7 +306,8 @@ def main() -> int:
             update_status="weekend_no_write",
             summary=(
                 f"조회 성공. 주말이므로 데이터 파일은 갱신하지 않았습니다. "
-                f"원천 최신값은 {latest_row.date} {latest_row.value:.1f}입니다."
+                f"저장 최신값은 {latest_row.date} {latest_row.value:.1f}입니다. "
+                f"CNN 원천 최신값은 {fetched_latest_row.date} {fetched_latest_row.value:.1f}입니다."
             ),
             latest_date=latest_row.date,
             latest_value=latest_row.value,
@@ -330,7 +332,8 @@ def main() -> int:
             fetch_status="success",
             update_status="updated",
             summary=(
-                f"조회 성공. 데이터 업데이트 완료. 최신값 {latest_row.date} {latest_row.value:.1f}. "
+                f"조회 성공. 데이터 업데이트 완료. 저장 최신값 {latest_row.date} {latest_row.value:.1f}. "
+                f"CNN 원천 최신값 {fetched_latest_row.date} {fetched_latest_row.value:.1f}. "
                 f"{previous_text}. 변경 일자 {changed_count}건.{preview_text}"
             ),
             latest_date=latest_row.date,
@@ -341,7 +344,10 @@ def main() -> int:
         result = UpdateResult(
             fetch_status="success",
             update_status="no_change",
-            summary=f"조회 성공. 변경 없음. 최신값은 {latest_row.date} {latest_row.value:.1f}로 유지됩니다.",
+            summary=(
+                f"조회 성공. 변경 없음. 저장 최신값은 {latest_row.date} {latest_row.value:.1f}로 유지됩니다. "
+                f"CNN 원천 최신값은 {fetched_latest_row.date} {fetched_latest_row.value:.1f}입니다."
+            ),
             latest_date=latest_row.date,
             latest_value=latest_row.value,
             changed_count=0,
