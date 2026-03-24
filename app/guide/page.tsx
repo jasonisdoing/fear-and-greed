@@ -59,7 +59,17 @@ export default function GuidePage() {
         <ul className="indicator-guide-list">
           <li>제공 범위는 2011년 1월 3일부터 현재까지입니다.</li>
           <li>CSV와 JSON 형식으로 장기 과거 데이터를 제공합니다.</li>
-          <li>메인 차트와 날짜별 아카이브 테이블로 데이터를 탐색할 수 있습니다.</li>
+          <li>메인 차트, 날짜별 아카이브 테이블, 공포 탐욕 백테스트 페이지로 데이터를 탐색할 수 있습니다.</li>
+        </ul>
+      </section>
+
+      <section className="indicator-guide">
+        <h2 className="indicator-guide-title">공포 탐욕 백테스트</h2>
+        <ul className="indicator-guide-list">
+          <li>공포 탐욕 지수 기준을 5·10·15·20·25 이하로 선택해 S&amp;P 500 이후 수익률을 비교할 수 있습니다.</li>
+          <li>보유 기간은 1주일, 1개월, 3개월, 6개월, 1년 기준으로 계산합니다.</li>
+          <li>현재 백테스트 비교 구간은 2016년 3월 24일 ~ 2026년 3월 20일이며, 향후 더 긴 기간으로 확장할 예정입니다.</li>
+          <li>만기가 아직 지나지 않은 표본은 해당 기간 통계에서 자동 제외됩니다.</li>
         </ul>
       </section>
 
