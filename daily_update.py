@@ -21,6 +21,7 @@ CNN_URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
 SLACK_CHANNEL_ID = "C0AK2481V33"
 SLACK_API_URL = "https://slack.com/api/chat.postMessage"
 NEW_YORK_TZ = ZoneInfo("America/New_York")
+RECENT_UPDATE_WINDOW_DAYS = 2
 
 
 @dataclass(frozen=True)
@@ -248,11 +249,16 @@ def load_existing_rows() -> list[FearGreedRow]:
 
 
 def merge_rows(previous_rows: list[FearGreedRow], fetched_rows: list[FearGreedRow]) -> list[FearGreedRow]:
-    merged_by_date = {row.date: row for row in previous_rows}
+    if not previous_rows:
+        return fetched_rows
 
-    # CNN 원천에 있는 날짜만 최신 값으로 덮어쓰고, 빠진 기존 날짜는 그대로 보전한다.
+    merged_by_date = {row.date: row for row in previous_rows}
+    recent_dates = {row.date for row in fetched_rows[-RECENT_UPDATE_WINDOW_DAYS:]}
+
+    # 새 날짜와 최근 2일만 CNN 원천 값으로 갱신하고, 그보다 오래된 날짜는 기존 값을 보전한다.
     for row in fetched_rows:
-        merged_by_date[row.date] = row
+        if row.date not in merged_by_date or row.date in recent_dates:
+            merged_by_date[row.date] = row
 
     return sorted(merged_by_date.values(), key=lambda row: row.date)
 
