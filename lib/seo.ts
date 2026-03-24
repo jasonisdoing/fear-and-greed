@@ -47,6 +47,12 @@ export const detailPages: SeoPageConfig[] = [
     path: '/guide',
     keywords: ['CNN Fear & Greed guide', '공포탐욕지수 가이드', 'Fear and Greed data source', 'Fear and Greed guide'],
   },
+  {
+    title: '공포 탐욕 백테스트 · Fear & Greed 기반 S&P 500 전략',
+    description: '공포 탐욕 지수 기준을 선택해 S&P 500을 매수했을 경우 1주일·1개월·3개월·6개월·1년 뒤 수익률 통계를 비교해보세요.',
+    path: '/fear-and-greed-backtest',
+    keywords: ['공포 탐욕 백테스트', 'Fear and Greed backtest', 'S&P 500 공포 구간 매수', '공포탐욕지수 전략', '시장 심리 백테스트'],
+  },
 ];
 
 export function buildMetadata(config: SeoPageConfig): Metadata {

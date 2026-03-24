@@ -20,8 +20,9 @@ export default function DashboardSidebar() {
 
   const navItems = [
     { path: '/', label: 'CNN 공포 탐욕 지수', shortLabel: '공포 탐욕 지수', icon: '🧭' },
-    { path: '/history', label: '과거 데이터', icon: '📊' },
+    { path: '/fear-and-greed-backtest', label: '극단적 공포 백테스트', shortLabel: '공포 백테스트', icon: '🧪' },
     { path: '/sp500-momentum', label: 'S&P 500 모멘텀', icon: '📈' },
+    { path: '/history', label: '과거 데이터', icon: '📊' },
     { path: '/guide', label: '가이드', icon: '🗂️' },
   ];
 

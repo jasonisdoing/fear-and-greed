@@ -32,6 +32,55 @@ export interface MomentumData {
   signal: 'BULLISH(강세)' | 'BEARISH(약세)';
 }
 
+export type BacktestHorizonKey = '1w' | '1m' | '3m' | '6m' | '12m';
+
+export interface BacktestReturnPoint {
+  exitDate: string;
+  exitPrice: number;
+  returnPct: number;
+}
+
+export interface BacktestTrade {
+  entryDate: string;
+  fearGreedScore: number;
+  entryPrice: number;
+  returns: Partial<Record<BacktestHorizonKey, BacktestReturnPoint>>;
+}
+
+export interface BacktestSummary {
+  key: BacktestHorizonKey;
+  label: string;
+  sampleCount: number;
+  averageReturnPct: number | null;
+  medianReturnPct: number | null;
+  winRatePct: number | null;
+  bestReturnPct: number | null;
+  worstReturnPct: number | null;
+}
+
+export interface SP500BacktestData {
+  threshold: number;
+  tradeCount: number;
+  fearGreedRange: {
+    startDate: string;
+    endDate: string;
+  };
+  sp500Range: {
+    startDate: string;
+    endDate: string;
+  };
+  analysisRange: {
+    startDate: string;
+    endDate: string;
+  };
+  dataSource: {
+    fearGreed: string;
+    sp500: string;
+  };
+  summaries: BacktestSummary[];
+  trades: BacktestTrade[];
+}
+
 export type TabId =
   | 'sp500'
   | 'nasdaq'

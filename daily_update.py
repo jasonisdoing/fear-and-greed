@@ -21,6 +21,8 @@ CNN_URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
 SLACK_CHANNEL_ID = "C0AK2481V33"
 SLACK_API_URL = "https://slack.com/api/chat.postMessage"
 NEW_YORK_TZ = ZoneInfo("America/New_York")
+RECENT_UPDATE_POINT_COUNT = 2
+MIN_HISTORY_START_DATE = "2011-01-03"
 
 
 @dataclass(frozen=True)
@@ -247,14 +249,49 @@ def load_existing_rows() -> list[FearGreedRow]:
     return sorted(rows, key=lambda row: row.date)
 
 
-def merge_rows(previous_rows: list[FearGreedRow], fetched_rows: list[FearGreedRow]) -> list[FearGreedRow]:
+def pick_recent_rows(fetched_rows: list[FearGreedRow]) -> list[FearGreedRow]:
+    if not fetched_rows:
+        raise RuntimeError("CNN 원천 최신 포인트를 찾을 수 없습니다.")
+
+    return fetched_rows[-RECENT_UPDATE_POINT_COUNT:]
+
+
+def patch_recent_rows(previous_rows: list[FearGreedRow], recent_rows: list[FearGreedRow]) -> list[FearGreedRow]:
+    if not previous_rows:
+        raise RuntimeError("기존 장기 데이터가 없어서 최근 2포인트 패치를 수행할 수 없습니다.")
+
     merged_by_date = {row.date: row for row in previous_rows}
 
-    # CNN 원천에 있는 날짜만 최신 값으로 덮어쓰고, 빠진 기존 날짜는 그대로 보전한다.
-    for row in fetched_rows:
+    # CNN 원천 최신 2개 포인트만 비교해서 같은 날짜를 수정하거나 새 날짜를 추가한다.
+    for row in recent_rows:
         merged_by_date[row.date] = row
 
     return sorted(merged_by_date.values(), key=lambda row: row.date)
+
+
+def validate_merged_rows(previous_rows: list[FearGreedRow], current_rows: list[FearGreedRow]) -> None:
+    if not current_rows:
+        raise RuntimeError("병합 결과가 비어 있습니다.")
+
+    current_start_date = current_rows[0].date
+    if current_start_date > MIN_HISTORY_START_DATE:
+        raise RuntimeError(
+            f"병합 결과 시작일이 {current_start_date}로 밀렸습니다. 최소 시작일 {MIN_HISTORY_START_DATE}를 보전해야 합니다."
+        )
+
+    if not previous_rows:
+        return
+
+    previous_start_date = previous_rows[0].date
+    if current_start_date > previous_start_date:
+        raise RuntimeError(
+            f"병합 결과 시작일이 {previous_start_date}에서 {current_start_date}로 뒤로 밀렸습니다."
+        )
+
+    if len(current_rows) < len(previous_rows):
+        raise RuntimeError(
+            f"병합 결과 행 수가 {len(previous_rows)}건에서 {len(current_rows)}건으로 감소했습니다."
+        )
 
 
 def build_change_preview(previous_rows: list[FearGreedRow], current_rows: list[FearGreedRow]) -> tuple[int, str]:
@@ -297,27 +334,11 @@ def main() -> int:
     payload = fetch_cnn_payload()
     fetched_rows = build_rows(payload)
     fetched_latest_row = fetched_rows[-1]
-    rows = merge_rows(previous_rows, fetched_rows)
+    recent_rows = pick_recent_rows(fetched_rows)
+
+    rows = patch_recent_rows(previous_rows, recent_rows)
+    validate_merged_rows(previous_rows, rows)
     latest_row = rows[-1]
-
-    if is_new_york_weekend():
-        result = UpdateResult(
-            fetch_status="success",
-            update_status="weekend_no_write",
-            summary=(
-                f"조회 성공. 주말이므로 데이터 파일은 갱신하지 않았습니다. "
-                f"저장 최신값은 {latest_row.date} {latest_row.value:.1f}입니다. "
-                f"CNN 원천 최신값은 {fetched_latest_row.date} {fetched_latest_row.value:.1f}입니다."
-            ),
-            latest_date=latest_row.date,
-            latest_value=latest_row.value,
-            changed_count=0,
-        )
-        write_github_output(result)
-        notify_local_slack_success(result)
-        print(result.summary)
-        return 0
-
     changed = update_files(rows)
 
     if changed:
