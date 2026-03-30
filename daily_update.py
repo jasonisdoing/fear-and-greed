@@ -155,16 +155,14 @@ def notify_local_slack_success(result: UpdateResult) -> None:
     if is_github_actions():
         return
 
-    if result.update_status == "no_change":
-        # 노란 색(no_change)의 경우 슬랙을 보내지 않도록 함 (코드를 삭제하지 않고 return으로 처리)
-        return
-
+    site_url = "https://fear-and-greed.jason.ai.kr/"
+    source_url = "https://edition.cnn.com/markets/fear-and-greed"
     text = build_slack_message(
         fetch_status=result.fetch_status,
         update_status=result.update_status,
         summary=result.summary,
         commit_text="커밋 없음",
-        run_text="https://fear-and-greed.jason.ai.kr/",
+        run_text=f"사이트: {site_url}\n원본: {source_url}",
     )
     send_slack_message(text)
 

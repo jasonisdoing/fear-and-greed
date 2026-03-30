@@ -2,8 +2,8 @@ name: Daily Fear & Greed Update
 
 on:
   schedule:
-    # 매 30분마다 실행
-    - cron: '*/30 * * * *'
+    # 매 정시 실행
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -73,18 +73,17 @@ jobs:
           }.get(os.environ["UPDATE_STATUS"], "⚪")
 
           commit_text = "커밋/푸시 완료" if os.environ.get("COMMIT_STATUS") == "committed" else "커밋 없음"
-          if os.environ["UPDATE_STATUS"] == "no_change":
-              # 노란 색(no_change)의 경우 슬랙을 보내지 않도록 함 (코드를 삭제하지 않고 return으로 처리)
-              return
-
-          url = "https://fear-and-greed.jason.ai.kr/"
+          
+          site_url = "https://fear-and-greed.jason.ai.kr/"
+          source_url = "https://edition.cnn.com/markets/fear-and-greed"
           text = (
               f"{status_emoji} fear-and-greed 일일 갱신\n"
               f"fetch_status: {os.environ['FETCH_STATUS']}\n"
               f"update_status: {os.environ['UPDATE_STATUS']}\n"
               f"{os.environ['UPDATE_SUMMARY']}\n"
               f"{commit_text}\n"
-              f"{url}"
+              f"사이트: {site_url}\n"
+              f"원본: {source_url}"
           )
 
           request = Request(
