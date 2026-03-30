@@ -2,7 +2,7 @@ name: Daily Fear & Greed Update
 
 on:
   schedule:
-    # 매시 15분 실행
+    # 매 정시 실행
     - cron: '0 * * * *'
   workflow_dispatch:
 
@@ -73,13 +73,17 @@ jobs:
           }.get(os.environ["UPDATE_STATUS"], "⚪")
 
           commit_text = "커밋/푸시 완료" if os.environ.get("COMMIT_STATUS") == "committed" else "커밋 없음"
+          
+          site_url = "https://fear-and-greed.jason.ai.kr/"
+          source_url = "https://edition.cnn.com/markets/fear-and-greed"
           text = (
               f"{status_emoji} fear-and-greed 일일 갱신\n"
               f"fetch_status: {os.environ['FETCH_STATUS']}\n"
               f"update_status: {os.environ['UPDATE_STATUS']}\n"
               f"{os.environ['UPDATE_SUMMARY']}\n"
               f"{commit_text}\n"
-              f"Run: https://github.com/{os.environ['REPOSITORY']}/actions/runs/{os.environ['RUN_ID']}"
+              f"사이트: {site_url}\n"
+              f"원본: {source_url}"
           )
 
           request = Request(

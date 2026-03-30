@@ -155,12 +155,14 @@ def notify_local_slack_success(result: UpdateResult) -> None:
     if is_github_actions():
         return
 
+    site_url = "https://fear-and-greed.jason.ai.kr/"
+    source_url = "https://edition.cnn.com/markets/fear-and-greed"
     text = build_slack_message(
         fetch_status=result.fetch_status,
         update_status=result.update_status,
         summary=result.summary,
         commit_text="커밋 없음",
-        run_text="Run: local python daily_update.py",
+        run_text=f"사이트: {site_url}\n원본: {source_url}",
     )
     send_slack_message(text)
 
@@ -179,7 +181,12 @@ def notify_local_slack_failure(error_message: str) -> None:
     send_slack_message(text)
 
 
-def normalize_timestamp(raw_timestamp: int | float) -> datetime:
+def normalize_timestamp(raw_timestamp: int | float | str) -> datetime:
+    if isinstance(raw_timestamp, str):
+        # ISO 형식(예: 2026-03-30T12:56:46+00:00)의 문자열인 경우 처리
+        # UTC 타임존 정보를 포함하고 있으므로 fromisoformat을 사용
+        return datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00"))
+
     timestamp = float(raw_timestamp)
     if timestamp > 1_000_000_000_000:
         timestamp /= 1000
@@ -193,9 +200,19 @@ def build_rows(payload: dict) -> list[FearGreedRow]:
 
     rows_by_date: dict[str, FearGreedRow] = {}
 
+    # 1. 기존 역사적 데이터를 먼저 채움
     for item in sorted(historical_data, key=lambda value: value["x"]):
         date = normalize_timestamp(item["x"]).date().isoformat()
         rows_by_date[date] = FearGreedRow(date=date, value=round(float(item["y"]), 1))
+
+    # 2. 실시간 데이터(score)를 오늘 날짜 데이터로 주입하여 보정
+    # 차트 상단의 실시간 지수(예: 13.8)와 차트 끝부분(예: 10.9) 사이의 간극을 메움
+    current = payload.get("fear_and_greed", {})
+    if current and "score" in current and "timestamp" in current:
+        current_date = normalize_timestamp(current["timestamp"]).date().isoformat()
+        current_value = round(float(current["score"]), 1)
+        # 실시간 데이터를 명시적으로 추가/덮어쓰기 하여 차트와 실시간 값 동기화
+        rows_by_date[current_date] = FearGreedRow(date=current_date, value=current_value)
 
     rows = sorted(rows_by_date.values(), key=lambda row: row.date)
     if not rows:
