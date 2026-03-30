@@ -396,7 +396,7 @@ export default function GeneralChart({ compactHeader = false }: GeneralChartProp
           timeScale: {
             borderVisible: false,
             timeVisible: false,
-            rightOffset: 6,
+            rightOffset: 12,
             barSpacing: 8,
             minBarSpacing: 0.35,
             fixLeftEdge: false,
@@ -422,7 +422,7 @@ export default function GeneralChart({ compactHeader = false }: GeneralChartProp
         });
 
         const ghostSeries = chart.addSeries(LineSeries, {
-          title: 'CNN 공포탐욕지수',
+          title: '',
           color: 'rgba(12, 12, 12, 0.14)',
           lineWidth: 3,
           crosshairMarkerVisible: true,
